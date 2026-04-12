@@ -43,9 +43,12 @@ Current implementation target is the `@signalk/sdk` package with ESM-first outpu
 | Value mapping | `meta.type` only for path value payload schema selection | Declarative, explicit, transport-agnostic |
 | Static payloads | Metadata and notification payloads use static schemas (not `meta.type`-mapped) | These are well-defined; no dynamic routing needed |
 | Parser default | Lenient by default | Better for production resiliency; strictness configurable at init |
+| Strictness scope | Strictness affects payload validation only (values/metadata/notifications), not transport schema classification | Keeps transport classification deterministic while allowing payload-noise control |
+| Transport schema behavior | Deterministic; subscription format remains `delta`-only regardless of strictness mode | Avoids hidden transport behavior changes from payload tuning flags |
 | Parser output | Always structured non-throwing | Never throws on data quality issues; return statuses instead |
 | API presentation | Exports via `@signalk/sdk` and subpath modules (`/delta`, `/rest`, `/parser`, `/codegen`) | Read-only API surface and clear domain separation |
 | Docs/codegen source | Generated from TypeBox schemas | Single source of truth; OpenAPI/AsyncAPI derived |
+| IntelliSense enrichment | `@sinclair/typebox-codegen` (Option B) — schema `description` → generated JSDoc-annotated `.d.ts` | Single source of truth for IDE hover text; avoids duplicating JSDoc alongside validation schemas; requires `description` on every TypeBox property |
 | Extension model | Closed for v1 | No third-party schema plugins in initial release |
 | Packaging | Publish from `dist/package` in `@signalk/sdk` only | Matches current build, pack, and smoke-install flow |
 | Terminology | Transport (`delta-data` + `protocol-control`) + Payload (inner domain objects) | Distinguishes container-level entities from payload objects |
@@ -85,6 +88,7 @@ Current implementation target is the `@signalk/sdk` package with ESM-first outpu
 - Union narrowers: predicates for `PayloadValue | null` → specific payload type.
 - Schema introspection: `getSchemaForType(type: string)` returns schema metadata.
 - Error narrowers: `(error): error is ValidationError` with field path access.
+- JSDoc codegen: `@sinclair/typebox-codegen` reads TypeBox schema `description` fields and emits JSDoc-annotated `.d.ts` declarations; IDE hover text is derived from schemas, not maintained separately.
 
 ## Parser Contract
 
@@ -92,21 +96,46 @@ Current implementation target is the `@signalk/sdk` package with ESM-first outpu
 ```ts
 type ParserConfig = {
   strictness?: 'lenient' | 'strict'  // default: lenient
-  validationScope?: 'transport' | 'payload' | 'both'  // default: both
+   validationScope?: 'transport' | 'payload' | 'metadata' | 'all'  // default: all
   transportScope?: 'delta-data' | 'protocol-control' | 'all'  // default: all
-  formatValidation?: boolean  // default: true
-  category?: 'values' | 'metadata' | 'notifications' | null  // default: null (all)
+   transportErrorMode?: 'verbose' | 'primary'  // default: primary
 }
 
 function createParser(config?: ParserConfig): Parser
 ```
 
 ### 2. Validation Scoping
-- Allow selecting transport-only, payload-only, or both-layer validation.
+- Allow selecting transport-only, payload-only, metadata-only, or both-layer validation.
 - Allow transport sub-scoping: delta-data only, protocol-control only, or both.
 - Allow only subscription `format: "delta"` in supported protocol messages.
-- Allow format validation toggle.
-- Allow category scoping (values-only, metadata-only, notifications-only).
+- Transport schema behavior is deterministic and independent of parser strictness mode.
+
+### 2A. Strictness Semantics
+- `strict` mode (payload layer):
+   - metadata: validate against metadata schema; invalid entries return invalid outcomes.
+   - values: known `meta.type` mappings validate against typed schemas; unknown schema types are invalid; missing schema mappings remain not-validated.
+   - notifications: validate against notification schema; invalid entries return invalid outcomes.
+- `lenient` mode (payload layer):
+   - metadata: validate against metadata schema; invalid entries return invalid outcomes.
+   - values: known `meta.type` mappings validate against typed schemas; unknown schema types and missing mappings are returned as not-validated outcomes with explicit status.
+   - notifications: validate against notification schema; invalid entries return invalid outcomes.
+- Non-throwing behavior is preserved in both modes.
+
+### 2B. Mode Outcome Matrix (Phase 2A)
+This matrix is normative for value-entry outcomes and is used for Phase 2A Gate B approval.
+
+| Pattern | Detection condition | Lenient mode | Strict mode | Notes |
+|---|---|---|---|---|
+| Known schema, valid value | `meta.type` resolves to a known schema and value passes schema check | `schemaTypeStatus=known-schema-type`, `validationStatus=valid`, `validationErrors=[]` | `schemaTypeStatus=known-schema-type`, `validationStatus=valid`, `validationErrors=[]` | Non-throwing |
+| Known schema, invalid value | `meta.type` resolves to a known schema and value fails schema check | `schemaTypeStatus=known-schema-type`, `validationStatus=invalid`, `validationErrors` present | `schemaTypeStatus=known-schema-type`, `validationStatus=invalid`, `validationErrors` present | Non-throwing |
+| Unknown schema type | `meta.type` exists but does not resolve to known schema | `schemaTypeStatus=unknown-schema-type`, `validationStatus=not-validated`, no `validationErrors` | `schemaTypeStatus=unknown-schema-type`, `validationStatus=invalid`, `validationErrors` present | Fixed by Phase 2A Gate B decision |
+| Missing schema mapping | no usable `meta.type` mapping for path | `schemaTypeStatus=no-schema-type`, `validationStatus=not-validated`, no `validationErrors` | `schemaTypeStatus=no-schema-type`, `validationStatus=not-validated`, no `validationErrors` | Fixed by Phase 2A Gate B decision |
+| Invalid path | path is empty, non-string, or otherwise invalid | `schemaTypeStatus=invalid-path`, `validationStatus=invalid`, `validationErrors` present | `schemaTypeStatus=invalid-path`, `validationStatus=invalid`, `validationErrors` present | Non-throwing |
+
+Phase 2A Gate B completion requirements for this matrix:
+1. Unknown schema type strict-mode policy is explicitly selected and recorded.
+2. Missing schema mapping strict-mode policy is explicitly selected and recorded.
+3. Tests in `packages/sdk/test/sdk.test.mjs` assert each row in this table for both modes.
 
 ### 3. Type Resolution
 - For path values: schema resolution driven by `meta.type`.
@@ -126,6 +155,42 @@ From TypeBox schemas, generate:
 2. **OpenAPI specification** (for API consumers).
 3. **AsyncAPI specification** (for event stream consumers).
 4. **Runtime validators** (compiled TypeBox validators).
+5. **JSDoc-annotated TypeScript declarations** — generated by `@sinclair/typebox-codegen`; TypeBox schema `description` fields become `/** ... */` hover text in consuming IDEs. Requires `description` populated on every property across all schemas before Phase 3 Gate A.
+
+### Schema Annotation Standard (TypeBox -> IDE Docs)
+
+Required schema metadata:
+- `description`: required on every schema object and every named property.
+- `deprecated`: required for legacy fields (paired with migration guidance in `description`).
+- `default`: required when a runtime default exists.
+- `examples`: required when format/units/shape are non-obvious.
+- Constraints: use schema keywords directly (`format`, `pattern`, `minimum`, `maximum`, `minLength`, `maxLength`, `minItems`, `maxItems`, `multipleOf`) instead of prose-only rules.
+
+Codegen mapping policy (`@sinclair/typebox-codegen`):
+- `description` -> JSDoc body
+- `deprecated` -> `@deprecated`
+- `default` -> `@default`
+- `examples` -> `@example` (one tag per example)
+- Constraint keywords -> appended JSDoc constraint notes
+
+Acceptance expectations:
+- Phase 3 Gate A includes annotation coverage verification for all schema properties in scope.
+- Phase 3 Gate B includes generated `.d.ts` hover-text verification for representative payload and transport types.
+
+Phase 3 Gate Checklist Template:
+
+Gate A checklist:
+- [ ] Every schema and named property in scope has `description`.
+- [ ] Legacy fields include schema `deprecated` metadata and migration wording.
+- [ ] Runtime defaults are encoded with schema `default` where applicable.
+- [ ] Non-obvious fields include schema `examples`.
+- [ ] Validation constraints are encoded via schema keywords (format/pattern/range/length/items).
+
+Gate B checklist:
+- [ ] `@sinclair/typebox-codegen` declarations regenerated from current schemas.
+- [ ] Mapping policy is visible in output (`description`, `@deprecated`, `@default`, `@example`, constraint notes).
+- [ ] IDE hover verification completed for representative transport and payload types.
+- [ ] Gaps found during hover verification are fixed before Gate B approval.
 
 Artifacts are published from `@signalk/sdk` using `dist/package`; standalone `v1`/`v2` package groupings are not used.
 
@@ -186,13 +251,13 @@ import { SignalKRestClient as RestClient } from '@signalk/sdk/rest'
 - Default parser mode is lenient.
 - Parser returns structured statuses for all entries (valid/invalid/unknown/no-schema).
 - Parser does not throw on malformed data in normal operation.
+- Strictness mode affects payload validation only (values/metadata/notifications).
 
 ### 5. Validation Scoping ✓ Required
 - Config can run transport-only, payload-only, or both-layer validation.
 - Config can sub-scope transport to `delta-data`, `protocol-control`, or both.
 - Subscription protocol validation accepts only `format: "delta"`.
-- Config can disable/enable format checks.
-- Config can target values vs metadata vs notifications.
+- Transport schema classification is deterministic and independent of strict/lenient payload mode.
 
 ### 6. API Presentation Behavior ✓ Required
 - API presentation is provided by exports from `@signalk/sdk` and subpath modules.
@@ -202,6 +267,7 @@ import { SignalKRestClient as RestClient } from '@signalk/sdk/rest'
 ### 7. Codegen/Docs ✓ Required
 - OpenAPI and AsyncAPI are generated from TypeBox source schemas.
 - Generated TS types align with runtime validators.
+- JSDoc-annotated TypeScript declarations are generated via `@sinclair/typebox-codegen`; all TypeBox schema properties must carry a `description` field before Phase 3 Gate A.
 
 ### 8. Packaging & Bundle Strategy ✓ Required
 - Architecture uses `@signalk/sdk` with four internal modules: `delta`, `rest`, `parser`, `codegen`.
@@ -261,6 +327,7 @@ Every phase (and subphase) follows the same gate model:
 **M3: API Presentation + Docs**
 - Export surface (`@signalk/sdk`, `@signalk/sdk/delta`, `@signalk/sdk/rest`, `@signalk/sdk/parser`, `@signalk/sdk/codegen`).
 - OpenAPI/AsyncAPI generation from schemas.
+- JSDoc-annotated declarations generated from TypeBox `description` fields via `@sinclair/typebox-codegen`.
 - Developer tooling (IDE hints, helper modules).
 
 **M4: Codegen Pipeline + Release Guardrails**

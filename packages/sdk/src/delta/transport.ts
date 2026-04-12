@@ -1,5 +1,6 @@
-import Type from 'typebox'
+import Type, { type TSchema } from 'typebox'
 import { Value } from 'typebox/value'
+import { PositionSchema } from '@signalk/server-api/typebox'
 
 export type TransportScope = 'delta-data' | 'protocol-control' | 'all'
 
@@ -19,22 +20,9 @@ const MetaSchema = Type.Object(
   { additionalProperties: false }
 )
 
-const SourceSchema = Type.Object({
-  label: Type.String(),
-  type: Type.Optional(Type.String()),
-  src: Type.Optional(Type.String()),
-  canName: Type.Optional(Type.String()),
-  pgn: Type.Optional(Type.Number()),
-  instance: Type.Optional(Type.String()),
-  sentence: Type.Optional(Type.String()),
-  talker: Type.Optional(Type.String()),
-  aisType: Type.Optional(Type.Integer({ minimum: 1, maximum: 27 }))
-})
-
 const UpdateBaseSchema = Type.Object({
   timestamp: Type.Optional(Type.String()),
-  source: Type.Optional(SourceSchema),
-  $source: Type.Optional(Type.String({ pattern: '^[A-Za-z0-9-_.]*$' })),
+  $source: Type.Optional(Type.String()),       // Disregard specs { pattern: '^[A-Za-z0-9-_.]*$' })),
   notificationId: Type.Optional(Type.String())
 })
 
@@ -71,11 +59,7 @@ export type Update = DeltaData['updates'][number]
 const RelativePositionOriginSchema = Type.Object(
   {
     radius: Type.Number({ minimum: 0 }),
-    position: Type.Object({
-      latitude: Type.Number(),
-      longitude: Type.Number(),
-      altitude: Type.Optional(Type.Number())
-    })
+    position: PositionSchema as unknown as TSchema
   },
   { additionalProperties: false }
 )
@@ -102,38 +86,50 @@ export const ProtocolHelloMessageSchema = Type.Object(
 export const SubscriptionRequestSchema = Type.Object(
   {
     path: Type.Optional(Type.String()),
-    policy: Type.Optional(Type.Union([Type.Literal('fixed'), Type.Literal('instant')])),
+    policy: Type.Optional(Type.Literal('fixed')),
     period: Type.Optional(Type.Number()),
+    format: Type.Optional(Type.Literal('delta'))
+  },
+  {
+    additionalProperties: false,
+    allOf: [
+      {
+        not: {
+          required: ['minPeriod']
+        }
+      }
+    ]
+  }
+)
+
+const InstantSubscriptionRequestSchema = Type.Object(
+  {
+    path: Type.Optional(Type.String()),
+    policy: Type.Optional(Type.Literal('instant')),
     minPeriod: Type.Optional(Type.Number()),
     format: Type.Optional(Type.Literal('delta'))
   },
-  { additionalProperties: false }
+  {
+    additionalProperties: false,
+    allOf: [
+      {
+        not: {
+          required: ['period']
+        }
+      }
+    ]
+  }
 )
 
-export const RelaxedSubscriptionRequestSchema = Type.Object(
-  {
-    path: Type.Optional(Type.String()),
-    policy: Type.Optional(Type.Union([Type.Literal('fixed'), Type.Literal('instant')])),
-    period: Type.Optional(Type.Number()),
-    minPeriod: Type.Optional(Type.Number()),
-    format: Type.Optional(Type.String())
-  },
-  { additionalProperties: false }
-)
+const SubscriptionRequestUnionSchema = Type.Union([
+  SubscriptionRequestSchema,
+  InstantSubscriptionRequestSchema
+])
 
 export const ProtocolSubscribeMessageSchema = Type.Object(
   {
     context: Type.Union([Type.String(), RelativePositionOriginSchema]),
-    subscribe: Type.Array(SubscriptionRequestSchema),
-    announceNewPaths: Type.Optional(Type.Boolean())
-  },
-  { additionalProperties: false }
-)
-
-export const RelaxedProtocolSubscribeMessageSchema = Type.Object(
-  {
-    context: Type.Union([Type.String(), RelativePositionOriginSchema]),
-    subscribe: Type.Array(RelaxedSubscriptionRequestSchema),
+    subscribe: Type.Array(SubscriptionRequestUnionSchema),
     announceNewPaths: Type.Optional(Type.Boolean())
   },
   { additionalProperties: false }
@@ -179,14 +175,6 @@ export const ProtocolControlMessageSchema = Type.Union([
   ProtocolErrorMessageSchema
 ])
 
-export const RelaxedProtocolControlMessageSchema = Type.Union([
-  ProtocolHelloMessageSchema,
-  RelaxedProtocolSubscribeMessageSchema,
-  ProtocolUnsubscribeMessageSchema,
-  ProtocolAckMessageSchema,
-  ProtocolErrorMessageSchema
-])
-
 export type ProtocolHelloMessage = Type.Static<typeof ProtocolHelloMessageSchema>
 export type SubscriptionRequest = Type.Static<typeof SubscriptionRequestSchema>
 export type ProtocolSubscribeMessage = Type.Static<typeof ProtocolSubscribeMessageSchema>
@@ -207,11 +195,9 @@ export function isProtocolHelloMessage(value: unknown): value is ProtocolHelloMe
 
 export function isProtocolSubscribeMessage(
   value: unknown,
-  formatValidation = true
+  _formatValidation = true
 ): value is ProtocolSubscribeMessage {
-  return formatValidation
-    ? Value.Check(ProtocolSubscribeMessageSchema, value)
-    : Value.Check(RelaxedProtocolSubscribeMessageSchema, value)
+  return Value.Check(ProtocolSubscribeMessageSchema, value)
 }
 
 export function isProtocolUnsubscribeMessage(
@@ -230,9 +216,7 @@ export function isProtocolErrorMessage(value: unknown): value is ProtocolErrorMe
 
 export function isProtocolControlMessage(
   value: unknown,
-  formatValidation = true
+  _formatValidation = true
 ): value is ProtocolControlMessage {
-  return formatValidation
-    ? Value.Check(ProtocolControlMessageSchema, value)
-    : Value.Check(RelaxedProtocolControlMessageSchema, value)
+  return Value.Check(ProtocolControlMessageSchema, value)
 }

@@ -47,6 +47,7 @@
     "smoke:pack": "npm run build && npm pack ./dist/package --pack-destination ./dist",
     "smoke:install": "npm run smoke:pack && node ./scripts/install-smoke-artifact.mjs",
     "smoke:run": "npm run smoke:install && npm --prefix ./smoke-test-client run start",
+    "bench:payload": "npm run build && node ./scripts/benchmark-payload-validation.mjs",
     "validate:publish": "node ./scripts/validate-publish.mjs",
     "validate": "npm run build && npm run test && npm run validate:schema && npm run smoke:run && npm run validate:publish"
   },

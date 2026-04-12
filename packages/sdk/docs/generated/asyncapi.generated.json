@@ -1,0 +1,19 @@
+{
+  "asyncapi": "3.0.0",
+  "info": {
+    "title": "Signal K SDK AsyncAPI Snapshot",
+    "version": "0.1.0",
+    "description": "Primary source: packages/server-api/src; secondary source: https://github.com/SignalK/specification/tree/master/schemas"
+  },
+  "channels": {
+    "signalk/v1/stream": {
+      "address": "signalk/v1/stream",
+      "messages": {
+        "deltaMessage": {
+          "name": "deltaMessage",
+          "title": "Signal K delta stream message"
+        }
+      }
+    }
+  }
+}

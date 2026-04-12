@@ -68,6 +68,7 @@
     "packages/server-admin-ui",
     "packages/streams",
     "packages/server-api",
+    "packages/sdk",
     "packages/resources-provider-plugin",
     "packages/typedoc-theme",
     "packages/assemblyscript-plugin-sdk"

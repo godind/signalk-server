@@ -1,0 +1,20 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Signal K SDK OpenAPI Snapshot",
+    "version": "0.1.0",
+    "description": "Primary source: packages/server-api/src; secondary source: https://github.com/SignalK/specification/tree/master/schemas"
+  },
+  "paths": {
+    "/signalk/v1/api/vessels/self": {
+      "get": {
+        "summary": "Get self vessel model snapshot",
+        "responses": {
+          "200": {
+            "description": "Signal K vessel data"
+          }
+        }
+      }
+    }
+  }
+}

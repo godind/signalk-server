@@ -6,6 +6,9 @@
       "path": "./packages/server-api"
     },
     {
+      "path": "./packages/sdk"
+    },
+    {
       "path": "./packages/resources-provider-plugin"
     },
     {

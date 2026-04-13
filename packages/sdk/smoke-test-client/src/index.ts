@@ -1,17 +1,17 @@
-import { log, logActivity } from './logging.js'
+import { log, logActivity, logAlways } from './logging.js'
 import { logMetadataOutcomes, logPayloadOutcomes } from './payload-logging.js'
 import {
   createParser,
   getDeltaUpdateCount,
   isDelta,
-  parseDeltaJson
+  parseDeltaJson,
 } from '@signalk/sdk'
 
 const DEFAULT_WS_URL =
   'ws://localhost:3000/signalk/v1/stream?subscribe=*&sendMeta=all'
 const wsUrl = process.env.SK_WS_URL ?? DEFAULT_WS_URL
 
-const VALID_VALIDATION_SCOPES = ['transport', 'payload', 'metadata', 'all'] as const
+const VALID_VALIDATION_SCOPES = ['transport', 'payload', 'metadata', 'notification', 'all'] as const
 type SmokeValidationScope = (typeof VALID_VALIDATION_SCOPES)[number]
 const envValidationScope = process.env.SK_VALIDATION_SCOPE
 const validationScope: SmokeValidationScope =
@@ -19,6 +19,7 @@ const validationScope: SmokeValidationScope =
   (VALID_VALIDATION_SCOPES as readonly string[]).includes(envValidationScope)
     ? (envValidationScope as SmokeValidationScope)
     : 'all'
+const transportEnabled = validationScope === 'transport' || validationScope === 'all'
 
 const parser = createParser({
   validationScope,
@@ -46,9 +47,9 @@ async function processTransportStream(): Promise<never> {
   return new Promise((_, reject) => {
     const ws = new WebSocket(wsUrl)
 
-    log('info', 'ws.connect', 'connecting', { url: wsUrl })
+    logAlways('info', 'ws.connect', 'connecting', { url: wsUrl })
 
-    log('info', 'smoke.runtime', 'continuous mode enabled', {
+    logAlways('info', 'smoke.runtime', 'continuous mode enabled', {
       stop: 'terminate process (Ctrl+C)'
     })
 
@@ -68,8 +69,44 @@ async function processTransportStream(): Promise<never> {
 
       const parsed = parseDeltaJson(raw)
       if (parsed.ok && isDelta(parsed.value)) {
+        if (validationScope === 'transport') {
+          log('success', 'ws.message.classified', 'delta', {
+            valid: true,
+            updates: getDeltaUpdateCount(parsed.value),
+            scope: validationScope
+          })
+          return
+        }
+
+        if (validationScope === 'notification') {
+          parser.indexSchemaTypes(parsed.value)
+
+          const notificationOutcomes = parser.validateValues(parsed.value)
+            .filter((outcome) => outcome.path.startsWith('notifications.'))
+
+          if (notificationOutcomes.length === 0) {
+            return
+          }
+
+          logPayloadOutcomes(notificationOutcomes)
+
+          log('info', 'ws.message.classified', 'delta-notification-only', {
+            valid: true,
+            notificationCount: notificationOutcomes.length
+          })
+          return
+        }
+
         const metadataOutcomes = parser.processMetadata(parsed.value)
         logMetadataOutcomes(metadataOutcomes)
+
+        if (validationScope === 'metadata') {
+          log('info', 'ws.message.classified', 'delta-meta-only', {
+            valid: true,
+            updates: getDeltaUpdateCount(parsed.value)
+          })
+          return
+        }
 
         const payloadOutcomes = parser.validateValues(parsed.value)
         logPayloadOutcomes(payloadOutcomes)
@@ -100,6 +137,19 @@ async function processTransportStream(): Promise<never> {
         jsonCandidate = JSON.parse(raw)
       } catch {
         log('warn', 'ws.message.classified', 'non-json', { valid: false })
+        return
+      }
+
+      if (!transportEnabled) {
+        if (validationScope === 'notification') {
+          return
+        }
+
+        log('info', 'ws.message.classified', 'non-delta-ignored', {
+          valid: true,
+          scope: validationScope,
+          reason: 'transport-disabled'
+        })
         return
       }
 

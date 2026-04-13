@@ -39,7 +39,7 @@ export type {
   ValidatedMetadata
 } from './metadata-parser.js'
 
-export type ValidationScope = 'transport' | 'payload' | 'metadata' | 'all'
+export type ValidationScope = 'transport' | 'payload' | 'metadata' | 'notification' | 'all'
 export type TransportErrorMode = 'verbose' | 'primary'
 
 export interface ParserConfig {
@@ -253,7 +253,7 @@ export function createParser(config: ParserConfig = {}): SignalKParser {
   const transportScope = config.transportScope ?? 'all'
   const transportEnabled = validationScope === 'transport' || validationScope === 'all'
   const metadataEnabled = validationScope !== 'transport'
-  const valueEnabled = validationScope === 'payload' || validationScope === 'all'
+  const valueEnabled = validationScope === 'payload' || validationScope === 'notification' || validationScope === 'all'
   const transportErrorMode = config.transportErrorMode ?? 'primary'
   const schemaTypeIndex = createSchemaTypeIndex()
 

@@ -16,9 +16,9 @@ This file is the procedural execution plan. `SIGNALK_TYPES_SPEC.md` is the autho
 9. Planning docs and `docs/reference` snapshots are non-normative guidance and must not be used as runtime/build schema inputs.
 
 **Formal Status Tracking**
-- Active checkpoint: Phase 2B Gate A review.
-- Current recorded status: Phase 1 Gate A and Gate B approved on 2026-04-12; Phase 2A Gate A and Gate B approved on 2026-04-12; Phase 2B Gate A/Gate B are not yet formally approved.
-- Required next step: review/sign off Phase 2B Gate A, then Phase 2B Gate B before starting Phase 2C or later phases.
+- Active checkpoint: Phase 3 paused pending schema cleanup.
+- Current recorded status: Phase 1 Gate A and Gate B approved on 2026-04-12; Phase 2A Gate A and Gate B approved on 2026-04-12; Phase 2B Gate A and Gate B approved on 2026-04-12; Phase 2C Gate A and Gate B approved on 2026-04-12.
+- Required next step: complete schema cleanup for missing required annotations/descriptions in Phase 1-2 scope, then resume Phase 3 Gate A review.
 - Rule for future work: every transition must record the approved gate and the next active checkpoint here so progress is tracked procedurally, not inferred from code state.
 
 **Steps**
@@ -52,6 +52,7 @@ Rule: transport schema classification is deterministic and independent of strict
 
 5. Phase 3: API Presentation and Documentation Surface
 Spec traceability: `SIGNALK_TYPES_SPEC.md` Design Decisions: API presentation, Packaging, Packaging & Distribution, Acceptance Criteria 2/6/7/8.
+Status: paused pending schema cleanup for missing required annotations/descriptions.
 Gate A (post-analysis): confirm subpath module export ergonomics and naming, plus helper-surface decisions (type guards, type predicates, union narrowers, schema introspection, error narrowers); confirm that all TypeBox schemas authored in Phases 1–2 carry `description` on every property and that `@sinclair/typebox-codegen` coverage is complete.
 Implementation: define exports for `@signalk/sdk` and subpath modules (`/delta`, `/rest`, `/parser`, `/codegen`), plus OpenAPI/AsyncAPI derivation surfaces; run `@sinclair/typebox-codegen` build step to emit JSDoc-annotated `.d.ts` declarations from TypeBox schema `description` fields, replacing any manually maintained JSDoc.
 Gate B (post-implementation): approve import UX, docs output shape, developer helper surface, and IDE hover-text coverage from generated declarations.
@@ -60,6 +61,7 @@ Gate B (post-implementation): approve import UX, docs output shape, developer he
 Spec traceability: `SIGNALK_TYPES_SPEC.md` Generation and Artifacts, Packaging & Distribution, Acceptance Criteria 7/8/9.
 Gate A (post-analysis): confirm generation inputs and drift detection policy.
 Implementation: define `@signalk/sdk/codegen` outputs and guardrails (API snapshots, dependency boundary checks, tree-shaking checks, parser-registry artifact generation/update, upstream server-api comparison points when in doubt).
+Planning note: include an optional Arduino-focused codegen output that emits lightweight IntelliSense helper artifacts (for example constants/enums/header stubs) from the same TypeBox source of truth, with no new runtime validation requirements.
 Tooling reminder: implement option 3 for `Path` (compile-time branded type overlay) during codegen/tooling work so runtime schema behavior remains unchanged.
 Gate B (post-implementation): final release-readiness approval.
 
@@ -287,10 +289,10 @@ Approval record:
 - Approved Phase 2A as complete.
 - Implementation, tests, and spec/plan text have been verified against the fixed mode-outcome table above.
 
-### Phase 2B Gate A Review (Prepared, pending user approval)
+### Phase 2B Gate A Review
 
 Date prepared: 2026-04-12
-Status: pending approval
+Status: approved 2026-04-12
 
 Scope confirmation draft:
 - Metadata validation remains static and does not use `meta.type` routing for metadata-entry validation.
@@ -312,10 +314,10 @@ Gate A approval questions:
 - Approve Phase 2B scope as static metadata validation with typed valid/invalid outcomes?
 - Approve metadata enforcement parity across lenient and strict modes?
 
-### Phase 2B Gate B Review (Prepared, pending user approval)
+### Phase 2B Gate B Review
 
 Date prepared: 2026-04-12
-Status: pending approval
+Status: approved 2026-04-12
 
 Deliverable checklist draft:
 - Metadata payload typing is present.
@@ -345,6 +347,53 @@ Known follow-up before formal closure:
 
 Gate B approval question:
 - Approve Phase 2B as complete based on the current metadata parser behavior, result typing, and regression coverage?
+
+### Phase 2C Gate A Review
+
+Date prepared: 2026-04-12
+Status: approved 2026-04-12
+
+Scope confirmation draft:
+- Notification validation remains static and does not use `meta.type` routing.
+- Notification required/optional policy is fixed: `state`, `method`, and `message` are required; `status`, `position`, `createdAt`, and `id` are optional.
+- Strict/lenient parser mode does not change notification schema enforcement.
+- Notification validation failures remain non-throwing typed outcomes.
+
+Reviewed implementation evidence baseline:
+- Canonical notification schema is defined in `packages/server-api/src/typebox/protocol-schemas.ts` as `NotificationSchema`.
+- Notification schema is exported through `packages/server-api/src/typebox/notifications-schemas.ts`.
+
+Gate A approval record:
+- Approved Phase 2C scope as static notification validation with fixed required/optional field policy.
+- Approved strict/lenient enforcement parity and non-throwing notification outcome behavior as Phase 2C constraints.
+
+### Phase 2C Gate B Review
+
+Date prepared: 2026-04-12
+Status: approved 2026-04-12
+
+Deliverable checklist draft:
+- Notification payload schema registry wiring is present (`Notification` entry in `KnownValueSchemaRegistry`).
+- Notification parser route is present via value-path validation using `meta.type=Notification`, with `notifications.*` resolving to `Notification` without per-path metadata.
+- Optional-field policy tests are present for required (`state`,`method`,`message`) and optional (`status`,`position`,`createdAt`,`id`) behavior.
+- Compatibility fixture coverage is present for `value: null` notification payloads.
+
+Pass criteria evidence draft:
+- Notification validation is static apart from the explicit `notifications.* -> Notification` path fallback.
+- Required-field enforcement is verified: missing required notification fields returns `validationStatus=invalid` with structured validation errors.
+- Optional-field behavior is verified: minimal valid notification payloads and full payloads validate successfully.
+- Strict/lenient parity is verified for notification schema enforcement: invalid notification payloads return `validationStatus=invalid` in both modes.
+- Parser outcomes remain non-throwing for notification validation paths.
+
+Implementation/test evidence:
+- Validator compilation now includes schema context needed for notification `position` references in `packages/sdk/src/parser/payload-validators.ts`.
+- Notification Gate B regression tests added under `packages/sdk/test/sdk.test.mjs`:
+	- `notification value validation enforces required and optional fields`
+	- `notification validation mode parity and null compatibility are non-throwing`
+- Targeted verification command result: `node --test --test-name-pattern notification ./packages/sdk/test/**/*.test.mjs` passed (2/2).
+
+Gate B approval record:
+- Approved Phase 2C as complete based on current notification behavior, strict/lenient parity, and regression coverage.
 
 ## Conflict Decision Checkpoints
 

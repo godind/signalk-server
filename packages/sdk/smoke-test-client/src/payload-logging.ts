@@ -1,7 +1,11 @@
 import { type ParsedMetadata, type ParsedValue } from '@signalk/sdk'
-import { log } from './logging.js'
+import { log, logActivity } from './logging.js'
 
 export function logPayloadOutcomes(outcomes: ParsedValue[]): void {
+  if (outcomes.length === 0) {
+    return
+  }
+
   const known = outcomes.filter((entry) => entry.schemaTypeStatus === 'known-schema-type')
   const noSchema = outcomes.filter((entry) => entry.schemaTypeStatus === 'no-schema-type')
   const unknownSchema = outcomes.filter(
@@ -34,25 +38,102 @@ export function logPayloadOutcomes(outcomes: ParsedValue[]): void {
 
   const unknownSample = unknownSchema[0]
   if (unknownSample && unknownSample.schemaTypeStatus === 'unknown-schema-type') {
-    log('warn', 'payload.unknown', 'observed', {
-      path: unknownSample.path,
-      valueType: unknownSample.valueType
-    })
+    logActivity([
+      {
+        channel: 'log',
+        level: 'warn',
+        event: 'payload.unknown',
+        message: 'observed',
+        fields: {
+          path: unknownSample.path,
+          valueType: unknownSample.valueType
+        }
+      },
+      {
+        channel: 'context',
+        event: 'payload.unknown',
+        message: 'payload validation details',
+        fields: {
+          schemaTypeStatus: unknownSample.schemaTypeStatus,
+          validationStatus: unknownSample.validationStatus,
+          valueType: unknownSample.valueType
+        }
+      },
+      {
+        channel: 'payload',
+        event: 'payload.unknown',
+        message: 'payload validation sample',
+        fields: {
+          sample: unknownSample
+        }
+      }
+    ])
   }
 
   const noSchemaSample = noSchema[0]
   if (noSchemaSample && noSchemaSample.schemaTypeStatus === 'no-schema-type') {
-    log('warn', 'payload.no-schema', 'observed', {
-      path: noSchemaSample.path
-    })
+    logActivity([
+      {
+        channel: 'log',
+        level: 'warn',
+        event: 'payload.no-schema',
+        message: 'observed',
+        fields: {
+          path: noSchemaSample.path
+        }
+      },
+      {
+        channel: 'context',
+        event: 'payload.no-schema',
+        message: 'payload validation details',
+        fields: {
+          schemaTypeStatus: noSchemaSample.schemaTypeStatus,
+          validationStatus: noSchemaSample.validationStatus
+        }
+      },
+      {
+        channel: 'payload',
+        event: 'payload.no-schema',
+        message: 'payload validation sample',
+        fields: {
+          sample: noSchemaSample
+        }
+      }
+    ])
   }
 
   const invalidPathSample = invalidPath[0]
   if (invalidPathSample && invalidPathSample.schemaTypeStatus === 'invalid-path') {
-    log('warn', 'payload.invalid-path', 'observed', {
-      path: invalidPathSample.path,
-      rawPath: invalidPathSample.rawPath
-    })
+    logActivity([
+      {
+        channel: 'log',
+        level: 'warn',
+        event: 'payload.invalid-path',
+        message: 'observed',
+        fields: {
+          path: invalidPathSample.path,
+          rawPath: invalidPathSample.rawPath
+        }
+      },
+      {
+        channel: 'context',
+        event: 'payload.invalid-path',
+        message: 'payload validation details',
+        fields: {
+          schemaTypeStatus: invalidPathSample.schemaTypeStatus,
+          validationStatus: invalidPathSample.validationStatus,
+          rawPath: invalidPathSample.rawPath
+        }
+      },
+      {
+        channel: 'payload',
+        event: 'payload.invalid-path',
+        message: 'payload validation sample',
+        fields: {
+          sample: invalidPathSample
+        }
+      }
+    ])
   }
 
   const invalidSample = invalidKnown[0]
@@ -61,15 +142,44 @@ export function logPayloadOutcomes(outcomes: ParsedValue[]): void {
     invalidSample.schemaTypeStatus === 'known-schema-type' &&
     invalidSample.validationStatus === 'invalid'
   ) {
-    log('error', 'payload.invalid', 'observed', {
-      path: invalidSample.path,
-      valueType: invalidSample.valueType,
-      errorCount: invalidSample.validationErrors.length
-    })
+    logActivity([
+      {
+        channel: 'log',
+        level: 'error',
+        event: 'payload.invalid',
+        message: 'observed',
+        fields: {
+          path: invalidSample.path,
+          valueType: invalidSample.valueType,
+          errorCount: invalidSample.validationErrors.length
+        }
+      },
+      {
+        channel: 'context',
+        event: 'payload.invalid',
+        message: 'payload validation details',
+        fields: {
+          validationErrors: invalidSample.validationErrors,
+          valueType: invalidSample.valueType
+        }
+      },
+      {
+        channel: 'payload',
+        event: 'payload.invalid',
+        message: 'payload validation sample',
+        fields: {
+          sample: invalidSample
+        }
+      }
+    ])
   }
 }
 
 export function logMetadataOutcomes(outcomes: ParsedMetadata[]): void {
+  if (outcomes.length === 0) {
+    return
+  }
+
   const valid = outcomes.filter((entry) => entry.validationStatus === 'valid')
   const invalid = outcomes.filter((entry) => entry.validationStatus === 'invalid')
   const invalidPath = invalid.filter((entry) => entry.path === '')
@@ -87,10 +197,39 @@ export function logMetadataOutcomes(outcomes: ParsedMetadata[]): void {
     invalidSample.validationStatus === 'invalid' &&
     invalidSample.validationErrors
   ) {
-    log('warn', 'metadata.invalid', 'observed', {
-      path: invalidSample.path,
-      rawPath: invalidSample.rawPath,
-      errorCount: invalidSample.validationErrors.length
-    })
+    logActivity([
+      {
+        channel: 'log',
+        level: 'warn',
+        event: 'metadata.invalid',
+        message: 'observed',
+        fields: {
+          path: invalidSample.path,
+          errorCount: invalidSample.validationErrors.length,
+          ...(invalidSample.rawPath !== undefined
+            ? { rawPath: invalidSample.rawPath }
+            : {})
+        }
+      },
+      {
+        channel: 'context',
+        event: 'metadata.invalid',
+        message: 'metadata validation details',
+        fields: {
+          validationErrors: invalidSample.validationErrors,
+          ...(invalidSample.rawPath !== undefined
+            ? { rawPath: invalidSample.rawPath }
+            : {})
+        }
+      },
+      {
+        channel: 'payload',
+        event: 'metadata.invalid',
+        message: 'metadata validation sample',
+        fields: {
+          sample: invalidSample
+        }
+      }
+    ])
   }
 }

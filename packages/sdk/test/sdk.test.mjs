@@ -502,3 +502,296 @@ test('validationScope=metadata disables value routes and preserves metadata rout
 
   assert.deepEqual(processValueResults, [])
 })
+
+test('notification value validation enforces required and optional fields', async () => {
+  const sdk = await sdkImportPromise
+
+  const parser = sdk.createParser()
+
+  const validResults = parser.validateValues({
+    context: 'vessels.self',
+    updates: [
+      {
+        $source: 'NMEA0183.COM1.GP',
+        values: [
+          {
+            path: 'notifications.mob',
+            value: {
+              state: 'normal',
+              method: ['visual', 'sound'],
+              message: 'MOB alarm active',
+              status: {
+                silenced: false,
+                acknowledged: false,
+                canSilence: true,
+                canAcknowledge: true,
+                canClear: true
+              },
+              position: { latitude: 60.123, longitude: 24.456 },
+              createdAt: '2026-04-12T10:15:00.000Z',
+              id: 'ac3a3b2d-07e8-4f25-92bc-98e7c92f7f1a'
+            }
+          }
+        ]
+      }
+    ]
+  })
+
+  assert.equal(validResults.length, 1)
+  assert.equal(validResults[0].schemaTypeStatus, 'known-schema-type')
+  assert.equal(validResults[0].validationStatus, 'valid')
+  assert.equal(validResults[0].valueType, 'Notification')
+
+  const optionalOnlyResults = parser.validateValues({
+    context: 'vessels.self',
+    updates: [
+      {
+        values: [
+          {
+            path: 'notifications.mob',
+            value: {
+              state: 'normal',
+              method: ['visual'],
+              message: 'Anchor alarm'
+            }
+          }
+        ]
+      }
+    ]
+  })
+
+  assert.equal(optionalOnlyResults.length, 1)
+  assert.equal(optionalOnlyResults[0].validationStatus, 'valid')
+
+  const missingRequiredResults = parser.validateValues({
+    context: 'vessels.self',
+    updates: [
+      {
+        values: [
+          {
+            path: 'notifications.mob',
+            value: {
+              state: 'normal',
+              method: ['visual']
+            }
+          }
+        ]
+      }
+    ]
+  })
+
+  assert.equal(missingRequiredResults.length, 1)
+  assert.equal(missingRequiredResults[0].schemaTypeStatus, 'known-schema-type')
+  assert.equal(missingRequiredResults[0].validationStatus, 'invalid')
+  assert.ok(Array.isArray(missingRequiredResults[0].validationErrors))
+  assert.ok(missingRequiredResults[0].validationErrors.length > 0)
+})
+
+test('notification validation mode parity and null compatibility are non-throwing', async () => {
+  const sdk = await sdkImportPromise
+
+  const lenientParser = sdk.createParser({ strictness: 'lenient' })
+  const strictParser = sdk.createParser({ strictness: 'strict' })
+
+  const invalidNotificationDelta = {
+    context: 'vessels.self',
+    updates: [
+      {
+        values: [
+          {
+            path: 'notifications.mob',
+            value: {
+              state: 'normal',
+              message: 'Missing method array'
+            }
+          }
+        ]
+      }
+    ]
+  }
+
+  const lenientInvalid = lenientParser.validateValues(invalidNotificationDelta)
+  const strictInvalid = strictParser.validateValues(invalidNotificationDelta)
+
+  assert.equal(lenientInvalid.length, 1)
+  assert.equal(strictInvalid.length, 1)
+  assert.equal(lenientInvalid[0].validationStatus, 'invalid')
+  assert.equal(strictInvalid[0].validationStatus, 'invalid')
+  assert.ok(Array.isArray(lenientInvalid[0].validationErrors))
+  assert.ok(Array.isArray(strictInvalid[0].validationErrors))
+  assert.ok(lenientInvalid[0].validationErrors.length > 0)
+  assert.ok(strictInvalid[0].validationErrors.length > 0)
+
+  const nullNotificationResults = lenientParser.validateValues({
+    context: 'vessels.self',
+    updates: [
+      {
+        values: [{ path: 'notifications.mob', value: null }]
+      }
+    ]
+  })
+
+  assert.equal(nullNotificationResults.length, 1)
+  assert.equal(nullNotificationResults[0].schemaTypeStatus, 'known-schema-type')
+  assert.equal(nullNotificationResults[0].validationStatus, 'valid')
+  assert.equal(nullNotificationResults[0].valueType, 'Notification')
+})
+
+test('notifications paths resolve to Notification without per-path metadata', async () => {
+  const sdk = await sdkImportPromise
+
+  const parser = sdk.createParser()
+
+  const results = parser.validateValues({
+    context: 'vessels.self',
+    updates: [
+      {
+        values: [
+          {
+            path: 'notifications.navigation.lostPosition',
+            value: {
+              state: 'alarm',
+              method: ['visual'],
+              message: 'GNSS fix lost'
+            }
+          }
+        ]
+      }
+    ]
+  })
+
+  assert.equal(results.length, 1)
+  assert.equal(results[0].schemaTypeStatus, 'known-schema-type')
+  assert.equal(results[0].validationStatus, 'valid')
+  assert.equal(results[0].valueType, 'Notification')
+})
+
+test('non-notification paths still require metadata for Notification validation', async () => {
+  const sdk = await sdkImportPromise
+
+  const parser = sdk.createParser()
+
+  const results = parser.validateValues({
+    context: 'vessels.self',
+    updates: [
+      {
+        values: [
+          {
+            path: 'alarms.engine',
+            value: {
+              state: 'warn',
+              method: ['sound'],
+              message: 'Engine overheat'
+            }
+          }
+        ]
+      }
+    ]
+  })
+
+  assert.equal(results.length, 1)
+  assert.equal(results[0].schemaTypeStatus, 'no-schema-type')
+  assert.equal(results[0].validationStatus, 'not-validated')
+})
+
+test('notification position ref resolves through payload validator schema context', async () => {
+  // Regression: payload-validators.ts compiles validators with a context map keyed by
+  // PositionSchema.$id. If that $id changes upstream or the context key drifts, the
+  // Type.Ref inside NotificationSchema fails and position values return schema-is-false.
+  // This test will fail if the resolver-key coupling breaks.
+  const sdk = await sdkImportPromise
+
+  const parser = sdk.createParser()
+
+  const results = parser.validateValues({
+    context: 'vessels.self',
+    updates: [
+      {
+        values: [
+          {
+            path: 'notifications.anchor',
+            value: {
+              state: 'alarm',
+              method: ['sound'],
+              message: 'Anchor dragging',
+              position: { latitude: 59.9, longitude: 23.1 }
+            }
+          }
+        ]
+      }
+    ]
+  })
+
+  assert.equal(results.length, 1)
+  assert.equal(results[0].validationStatus, 'valid',
+    'position field inside notification must resolve via schema context; if invalid, check PositionSchema.$id matches the context key in payload-validators.ts')
+})
+
+test('payload validator schema references are complete (guard test)', async () => {
+  // Guard: if a new Type.Ref is added to a payload schema in server-api, but the
+  // reference is not included in payloadSchemaReferences in payload-validators.ts,
+  // this test will fail with "schema is false" on the field with the missing ref.
+  // This ensures the centralized reference map stays in sync with payload registry dependencies.
+  const sdk = await sdkImportPromise
+
+  const parser = sdk.createParser()
+  parser.indexSchemaTypes({
+    context: 'vessels.self',
+    updates: [
+      {
+        meta: [
+          { path: 'navigation.position', value: { type: 'Position' } },
+          { path: 'alarms.engine', value: { type: 'Notification' } }
+        ]
+      }
+    ]
+  })
+
+  // Validate a position with all fields to exercise the Position schema fully
+  const positionResults = parser.validateValues({
+    updates: [
+      {
+        values: [
+          {
+            path: 'navigation.position',
+            value: { latitude: 60.0, longitude: 25.0 }
+          }
+        ]
+      }
+    ]
+  })
+  assert.equal(positionResults.length, 1)
+  assert.equal(positionResults[0].validationStatus, 'valid',
+    'Position value must validate; if not, check payloadSchemaReferences in payload-validators.ts contains all Position refs')
+
+  // Validate a notification with all optional fields populated to exercise all refs
+  const notificationResults = parser.validateValues({
+    updates: [
+      {
+        values: [
+          {
+            path: 'alarms.engine',
+            value: {
+              state: 'warn',
+              method: ['visual', 'sound'],
+              message: 'Engine overheat',
+              status: {
+                silenced: false,
+                acknowledged: false,
+                canSilence: true,
+                canAcknowledge: true,
+                canClear: false
+              },
+              position: { latitude: 60.1, longitude: 25.1 },
+              createdAt: '2026-04-12T12:00:00.000Z',
+              id: '550e8400-e29b-41d4-a716-446655440000'
+            }
+          }
+        ]
+      }
+    ]
+  })
+  assert.equal(notificationResults.length, 1)
+  assert.equal(notificationResults[0].validationStatus, 'valid',
+    'Fully-populated Notification value must validate; if not, check payloadSchemaReferences in payload-validators.ts contains all Notification/Position refs')
+})

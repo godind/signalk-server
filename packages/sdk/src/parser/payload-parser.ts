@@ -281,6 +281,14 @@ function isValidPath(path: unknown): path is string {
   return typeof path === 'string' && path.length > 0
 }
 
+function getImplicitValueType(path: string): SignalKSchemaName | undefined {
+  if (path.startsWith('notifications.')) {
+    return 'Notification'
+  }
+
+  return undefined
+}
+
 function getValidationErrors(
   validator: Validator,
   value: unknown
@@ -306,7 +314,7 @@ class SchemaTypeIndex {
   }
 
   lookupValueType(path: string): string | undefined {
-    return this.pathToMetaType.get(path)
+    return this.pathToMetaType.get(path) ?? getImplicitValueType(path)
   }
 
   lookupSchemaName(path: string): SignalKSchemaName | undefined {

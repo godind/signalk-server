@@ -4,6 +4,7 @@ const ANSI = {
   blue: '\u001b[34m',
   green: '\u001b[32m',
   yellow: '\u001b[33m',
+  orange: '\u001b[38;5;208m',
   red: '\u001b[31m',
   gray: '\u001b[90m'
 }
@@ -150,7 +151,15 @@ function repeatSummaryPrefix(): string {
   return '[INFO][log]'
 }
 
+function shouldEmitRepeatSummary(): boolean {
+  return shouldLog('info')
+}
+
 function updateRepeatSummaryInline(count: number): void {
+  if (!shouldEmitRepeatSummary()) {
+    return
+  }
+
   if (!process.stdout.isTTY) {
     return
   }
@@ -175,6 +184,15 @@ function finalizeRepeatSummaryLine(): void {
 
 function flushRepeatSummary(): void {
   if (!lastLineState || lastLineState.repeatCount === 1) {
+    return
+  }
+
+  if (!shouldEmitRepeatSummary()) {
+    repeatSummaryVisible = false
+    lastLineState = {
+      signature: lastLineState.signature,
+      repeatCount: 1
+    }
     return
   }
 
@@ -243,7 +261,7 @@ function emitDiagnosticLine(
 ): void {
   const prefix = `[${channel}][${event}]`
   const signature = renderLine(`${prefix} ${message}`, fields)
-  const color = channel === 'CONTEXT' ? 'yellow' : 'gray'
+  const color = channel === 'CONTEXT' ? 'orange' : 'gray'
   emitRenderedBlock([
     {
       prefix,
@@ -281,7 +299,7 @@ function renderActivityEntry(entry: ActivityEntry): RenderedLine | undefined {
   return {
     prefix,
     rendered: renderLine(`${prefix} ${entry.message}`, entry.fields),
-    color: entry.channel === 'context' ? 'yellow' : 'gray'
+    color: entry.channel === 'context' ? 'orange' : 'gray'
   }
 }
 
@@ -298,7 +316,24 @@ export function log(
   emitLine(level, event, message, fields)
 }
 
+export function logAlways(
+  level: LogLevel,
+  event: string,
+  message: string,
+  fields?: Record<string, unknown>
+): void {
+  emitLine(level, event, message, fields)
+}
+
 export function logActivity(entries: ActivityEntry[]): void {
+  const hasVisibleBaseLog = entries.some(
+    (entry) => entry.channel === 'log' && shouldLog(entry.level)
+  )
+
+  if (!hasVisibleBaseLog) {
+    return
+  }
+
   const lines = entries
     .map((entry) => renderActivityEntry(entry))
     .filter((entry): entry is RenderedLine => entry !== undefined)

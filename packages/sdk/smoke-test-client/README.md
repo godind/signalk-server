@@ -32,10 +32,11 @@ SK_WS_URL=ws://host:3000/signalk/v1/stream?subscribe=*&sendMeta=all
 
 ## Logging
 
-Logging is controlled by two environment variables:
+Smoke behavior is controlled by three environment variables:
 
 1. `SK_SMOKE_LOG_LEVEL`
 2. `SK_SMOKE_DIAGNOSTICS`
+3. `SK_VALIDATION_SCOPE`
 
 ### `SK_SMOKE_LOG_LEVEL`
 
@@ -56,7 +57,7 @@ Behavior:
 Consecutive duplicate logging activities are suppressed. An activity may contain one base log line or a grouped set of related lines such as `ERROR` + `CONTEXT` + `PAYLOAD` for the same event. When a different activity appears, the smoke client emits a summary line such as:
 
 ```text
-[INFO][log.repeat] previous line repeated count=5
+[INFO][log] Repeat count: 5
 ```
 
 Only consecutive identical activities are collapsed. If a different activity appears in between, counting resets.
@@ -96,10 +97,35 @@ SK_SMOKE_LOG_LEVEL=error SK_SMOKE_DIAGNOSTICS=payload npm run smoke:run -w @sign
 
 ## Diagnostics Policy
 
-Diagnostics mode is intentionally separate from log level.
+Diagnostics mode is combined with log level as an AND filter.
 
-- Log level controls which events are visible.
-- Diagnostics mode controls how much extra information is attached to those visible events.
+- Log level controls whether the base event is eligible to be emitted.
+- Diagnostics mode controls whether context and payload companions are emitted for eligible base events.
+- If the base log line is filtered out by `SK_SMOKE_LOG_LEVEL`, companion diagnostics are also suppressed.
+
+When diagnostics are enabled, warning/error outcome events can emit grouped entries:
+
+- base log line: `[WARN]` or `[ERROR]`
+- context companion: `[CONTEXT]` when `SK_SMOKE_DIAGNOSTICS=context|payload`
+- payload companion: `[PAYLOAD]` when `SK_SMOKE_DIAGNOSTICS=payload`
+
+### `SK_VALIDATION_SCOPE`
+
+Supported values:
+
+- `transport`
+- `payload`
+- `metadata`
+- `all`
+
+Behavior:
+
+- `transport`: transport parsing routes enabled, payload routes disabled
+- `payload`: metadata + value payload routes enabled, transport parsing disabled
+- `metadata`: metadata routes enabled, value payload routes disabled, transport parsing disabled
+- `all`: transport + metadata + value payload routes enabled
+
+When `SK_VALIDATION_SCOPE` is `payload` or `metadata`, non-delta JSON frames are treated as out-of-scope and logged as `non-delta-ignored` instead of transport parse errors.
 
 Current targeted payload diagnostics:
 

@@ -15,17 +15,33 @@
       "types": "./dist/package/delta/index.d.ts",
       "import": "./dist/package/delta/index.js"
     },
-    "./delta/transport": {
-      "types": "./dist/package/delta/transport.d.ts",
-      "import": "./dist/package/delta/transport.js"
+    "./delta/protocol": {
+      "types": "./dist/package/delta/protocol.d.ts",
+      "import": "./dist/package/delta/protocol.js"
+    },
+    "./delta/metadata": {
+      "types": "./dist/package/delta/metadata/index.d.ts",
+      "import": "./dist/package/delta/metadata/index.js"
+    },
+    "./delta/payload": {
+      "types": "./dist/package/delta/payload/index.d.ts",
+      "import": "./dist/package/delta/payload/index.js"
+    },
+    "./delta/payload/value": {
+      "types": "./dist/package/delta/payload/value.d.ts",
+      "import": "./dist/package/delta/payload/value.js"
+    },
+    "./delta/payload/notification": {
+      "types": "./dist/package/delta/payload/notification.d.ts",
+      "import": "./dist/package/delta/payload/notification.js"
     },
     "./rest": {
       "types": "./dist/package/rest/index.d.ts",
       "import": "./dist/package/rest/index.js"
     },
     "./parser": {
-      "types": "./dist/package/parser/index.d.ts",
-      "import": "./dist/package/parser/index.js"
+      "types": "./dist/package/parser/facade.d.ts",
+      "import": "./dist/package/parser/facade.js"
     },
     "./codegen": {
       "types": "./dist/package/codegen/index.d.ts",
@@ -36,20 +52,20 @@
     "dist/package"
   ],
   "scripts": {
-    "build": "rm -rf dist tsconfig.tsbuildinfo && tsc -b && npm run build:package",
     "build:package": "node ./scripts/prepare-package.mjs",
+    "build": "rm -rf dist tsconfig.tsbuildinfo && tsc -b && npm run build:package",
+    "test": "npm run build && node --test ./test/**/*.test.mjs",
+    "validate": "npm run build && npm run test && npm run validate:schema && npm run smoke:run && npm run validate:publish",
     "generate:openapi": "npm run build && node ./dist/codegen/cli.js openapi",
     "generate:asyncapi": "npm run build && node ./dist/codegen/cli.js asyncapi",
     "generate:docs": "npm run build && node ./dist/codegen/cli.js docs",
     "generate:all": "npm run generate:openapi && npm run generate:asyncapi && npm run generate:docs",
-    "test": "npm run build && node --test ./test/**/*.test.mjs",
     "validate:schema": "node ./scripts/check-spec-conflicts.mjs && npm run generate:all",
     "smoke:pack": "npm run build && npm pack ./dist/package --pack-destination ./dist",
     "smoke:install": "npm run smoke:pack && node ./scripts/install-smoke-artifact.mjs",
     "smoke:run": "npm run smoke:install && npm --prefix ./smoke-test-client run start",
     "bench:payload": "npm run build && node ./scripts/benchmark-payload-validation.mjs",
-    "validate:publish": "node ./scripts/validate-publish.mjs",
-    "validate": "npm run build && npm run test && npm run validate:schema && npm run smoke:run && npm run validate:publish"
+    "validate:publish": "node ./scripts/validate-publish.mjs"
   },
   "repository": {
     "type": "git",

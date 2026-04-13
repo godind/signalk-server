@@ -22,7 +22,7 @@ const MetaSchema = Type.Object(
 
 const UpdateBaseSchema = Type.Object({
   timestamp: Type.Optional(Type.String()),
-  $source: Type.Optional(Type.String()),       // Disregard specs { pattern: '^[A-Za-z0-9-_.]*$' })),
+  $source: Type.Optional(Type.String()),
   notificationId: Type.Optional(Type.String())
 })
 

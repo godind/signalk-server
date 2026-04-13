@@ -1,4 +1,5 @@
-import { type ParsedMetadata, type ParsedValue } from '@signalk/sdk'
+import type { ParsedValue } from '@signalk/sdk/parser'
+import type { Metadata } from '@signalk/sdk/parser'
 import { log, logActivity } from './logging.js'
 
 export function logPayloadOutcomes(outcomes: ParsedValue[]): void {
@@ -175,7 +176,7 @@ export function logPayloadOutcomes(outcomes: ParsedValue[]): void {
   }
 }
 
-export function logMetadataOutcomes(outcomes: ParsedMetadata[]): void {
+export function logMetadataOutcomes(outcomes: Metadata[]): void {
   if (outcomes.length === 0) {
     return
   }

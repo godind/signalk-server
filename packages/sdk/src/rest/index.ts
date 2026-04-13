@@ -1,4 +1,4 @@
-import { isDeltaDataMessage, type Delta } from '../delta/transport.js'
+import { isDeltaDataMessage, type Delta } from '../delta/protocol.js'
 
 export interface SignalKRestClientOptions {
   baseUrl: string

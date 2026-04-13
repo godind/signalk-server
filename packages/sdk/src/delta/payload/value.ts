@@ -1,0 +1,1 @@
+export type { Position } from '@signalk/server-api/typebox'

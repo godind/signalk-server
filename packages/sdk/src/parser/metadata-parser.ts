@@ -1,15 +1,15 @@
-import { type MetaValue } from '@signalk/server-api/typebox'
+import type { MetadataValue } from '../delta/metadata/index.js'
+
+export type { MetadataValue } from '../delta/metadata/index.js'
 
 export type MetadataValidationStatus = 'valid' | 'invalid'
-
-export type MetadataValuePayload = MetaValue
 
 export interface MetadataValidationError {
   path: string
   message: string
 }
 
-export interface NormalizedDeltaMetadataBase {
+export interface MetadataBase {
   context: string
   $source: string
   source?: unknown
@@ -17,16 +17,16 @@ export interface NormalizedDeltaMetadataBase {
   timestamp?: string
 }
 
-export type ValidatedMetadata = NormalizedDeltaMetadataBase & {
-  value: MetadataValuePayload
+export type ValidMetadata = MetadataBase & {
+  value: MetadataValue
   validationStatus: 'valid'
 }
 
-export type InvalidMetadata = NormalizedDeltaMetadataBase & {
+export type InvalidMetadata = MetadataBase & {
   rawPath?: unknown
   value: unknown
   validationStatus: 'invalid'
   validationErrors: MetadataValidationError[]
 }
 
-export type ParsedMetadata = ValidatedMetadata | InvalidMetadata
+export type Metadata = ValidMetadata | InvalidMetadata

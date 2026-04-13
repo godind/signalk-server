@@ -1,16 +1,14 @@
-import * as transport from './transport.js'
-import type { Delta, Update } from './transport.js'
+export {
+  isDeltaDataMessage,
+  isProtocolControlMessage
+} from './protocol.js'
 
-export type { Delta, Update }
+export type {
+  Delta,
+  Update,
+  TransportMessage,
+  ProtocolControlMessage,
+  TransportScope
+} from './protocol.js'
 
-export function isDelta(value: unknown): value is Delta {
-  return transport.isDeltaDataMessage(value)
-}
-
-export function getDeltaUpdateCount(delta: Delta): number {
-  return delta.updates.length
-}
-
-export function hasAnyValues(update: Update): boolean {
-  return 'values' in update && Array.isArray(update.values) && update.values.length > 0
-}
+export { isDelta, getDeltaUpdateCount, hasAnyValues } from './helpers.js'

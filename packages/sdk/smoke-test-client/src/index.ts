@@ -2,10 +2,10 @@ import { log, logActivity, logAlways } from './logging.js'
 import { logMetadataOutcomes, logPayloadOutcomes } from './payload-logging.js'
 import {
   createParser,
-  getDeltaUpdateCount,
-  isDelta,
   parseDeltaJson,
-} from '@signalk/sdk'
+} from '@signalk/sdk/parser'
+import { getDeltaUpdateCount, isDelta } from '@signalk/sdk/delta'
+
 
 const DEFAULT_WS_URL =
   'ws://localhost:3000/signalk/v1/stream?subscribe=*&sendMeta=all'

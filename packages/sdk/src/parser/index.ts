@@ -7,7 +7,7 @@ import {
   type ProtocolControlMessage,
   type TransportMessage,
   type TransportScope
-} from '../delta/transport.js'
+} from '../delta/protocol.js'
 import { Value } from 'typebox/value'
 import type { TSchema } from 'typebox'
 import {
@@ -18,7 +18,7 @@ import {
   validateDeltaMetadata,
   validateDeltaValues
 } from './payload-parser.js'
-import type { ParsedMetadata } from './metadata-parser.js'
+import type { InvalidMetadata, Metadata, ValidMetadata } from './metadata-parser.js'
 import type { ParsedValue } from './schema-type-registry.js'
 
 export type {
@@ -31,12 +31,11 @@ export type {
 
 export type {
   InvalidMetadata,
-  ParsedMetadata,
+  Metadata,
+  MetadataBase,
   MetadataValidationError,
   MetadataValidationStatus,
-  MetadataValuePayload,
-  NormalizedDeltaMetadataBase,
-  ValidatedMetadata
+  ValidMetadata
 } from './metadata-parser.js'
 
 export type ValidationScope = 'transport' | 'payload' | 'metadata' | 'notification' | 'all'
@@ -46,7 +45,6 @@ export interface ParserConfig {
   strictness?: 'lenient' | 'strict'
   validationScope?: ValidationScope
   transportScope?: TransportScope
-  /** @deprecated No-op for transport schema selection; retained for backward compatibility. */
   formatValidation?: boolean
   transportErrorMode?: TransportErrorMode
 }
@@ -82,12 +80,12 @@ export interface SignalKParser {
    * Validate metadata entries against static metadata schema.
    * Does not update the parser's internal meta.type index.
    */
-  validateMetadata(delta: Delta): ParsedMetadata[]
+  validateMetadata(delta: Delta): Metadata[]
 
   /**
    * Validate metadata entries and update the parser's internal meta.type index.
    */
-  processMetadata(delta: Delta): ParsedMetadata[]
+  processMetadata(delta: Delta): Metadata[]
 
   /**
    * Validate value entries using the existing meta.type index only.
@@ -245,6 +243,16 @@ function parseDeltaJsonInput(json: string): ParseResult<Delta> {
 
 export function parseDeltaJson(json: string): ParseResult<Delta> {
   return parseDeltaJsonInput(json)
+}
+
+export function isValidMetadata(metadata: Metadata): metadata is ValidMetadata {
+  return metadata.validationStatus === 'valid'
+}
+
+export function isInvalidMetadata(
+  metadata: Metadata
+): metadata is InvalidMetadata {
+  return metadata.validationStatus === 'invalid'
 }
 
 export function createParser(config: ParserConfig = {}): SignalKParser {

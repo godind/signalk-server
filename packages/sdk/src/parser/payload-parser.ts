@@ -1,6 +1,6 @@
-import type { Delta } from '../delta/transport.js'
+import type { Delta } from '../delta/protocol.js'
+import type { Metadata, MetadataValue } from './metadata-parser.js'
 import type { Validator } from 'typebox/compile'
-import type { MetadataValuePayload, ParsedMetadata } from './metadata-parser.js'
 import {
   KnownValueSchemaRegistry,
   type InvalidPathValue,
@@ -42,14 +42,14 @@ export function indexSchemaTypes(delta: Delta, index: SchemaTypeIndexView): void
 export function validateDeltaMetadata(
   delta: Delta,
   index: SchemaTypeIndexView
-): ParsedMetadata[] {
+): Metadata[] {
   return processMetadataEntries(delta, index, 'validate-only')
 }
 
 export function processDeltaMetadata(
   delta: Delta,
   index: SchemaTypeIndexView
-): ParsedMetadata[] {
+): Metadata[] {
   return processMetadataEntries(delta, index, 'index-and-validate')
 }
 
@@ -190,10 +190,10 @@ function processMetadataEntries(
   delta: Delta,
   index: SchemaTypeIndexView,
   mode: MetadataProcessingMode
-): ParsedMetadata[] {
+): Metadata[] {
   const updateIndex = mode !== 'validate-only'
   const collectResults = mode !== 'index-only'
-  const results: ParsedMetadata[] = []
+  const results: Metadata[] = []
   const context = typeof delta.context === 'string' ? delta.context : 'vessels.self'
 
   for (const update of delta.updates) {
@@ -252,7 +252,7 @@ function processMetadataEntries(
       if (compiledMetadataValidator.Check(metaEntry)) {
         results.push({
           ...base,
-          value: metaValue as MetadataValuePayload,
+          value: metaValue as MetadataValue,
           validationStatus: 'valid'
         })
       } else {

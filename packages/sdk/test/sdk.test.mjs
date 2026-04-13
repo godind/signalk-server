@@ -425,6 +425,37 @@ test('metadata parser returns valid and invalid entry outcomes', async () => {
   assert.ok(metadataOutcomes[1].validationErrors.length > 0)
 })
 
+test('metadata guards narrow valid and invalid metadata results', async () => {
+  const sdk = await sdkImportPromise
+
+  const parser = sdk.createParser()
+  const metadataOutcomes = parser.processMetadata({
+    context: 'vessels.self',
+    updates: [
+      {
+        $source: 'NMEA0183.COM1.GP',
+        meta: [
+          {
+            path: 'navigation.position',
+            value: { type: 'Position' }
+          },
+          {
+            path: 'navigation.speedOverGround',
+            value: { description: 42 }
+          }
+        ]
+      }
+    ]
+  })
+
+  assert.equal(metadataOutcomes.filter(sdk.isValidMetadata).length, 1)
+  assert.equal(metadataOutcomes.filter(sdk.isInvalidMetadata).length, 1)
+  assert.equal(sdk.isValidMetadata(metadataOutcomes[0]), true)
+  assert.equal(sdk.isInvalidMetadata(metadataOutcomes[0]), false)
+  assert.equal(sdk.isValidMetadata(metadataOutcomes[1]), false)
+  assert.equal(sdk.isInvalidMetadata(metadataOutcomes[1]), true)
+})
+
 test('invalid metadata does not fail transport stream parsing', async () => {
   const sdk = await sdkImportPromise
 

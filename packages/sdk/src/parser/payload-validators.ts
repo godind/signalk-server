@@ -2,11 +2,11 @@ import { Compile, type Validator } from 'typebox/compile'
 import type { TSchema } from 'typebox'
 import { MetaSchema, PositionSchema } from '@signalk/server-api/typebox'
 import {
-  KnownValueSchemaRegistry,
-  type SignalKSchemaName
+  KnownDeltaValueSchemaRegistry,
+  type DeltaSchemaName
 } from './schema-type-registry.js'
 
-export type CompiledPayloadValidators = Record<SignalKSchemaName, Validator>
+export type CompiledDeltaPayloadValidators = Record<DeltaSchemaName, Validator>
 
 /**
  * Extract the $id from a TypeBox schema with a guard that fails fast if missing.
@@ -30,24 +30,26 @@ function getSchemaId(schema: unknown): string {
  * they reference via Type.Ref are included here. A regression test validates that
  * all refs in the registry fully validate without errors.
  */
-const payloadSchemaReferences: Record<string, TSchema> = {
+const deltaSchemaReferences: Record<string, TSchema> = {
   [getSchemaId(PositionSchema)]: PositionSchema as unknown as TSchema
   // Add new referenced schemas here as payload registry grows.
   // Example: [getSchemaId(SomeNewSchema)]: SomeNewSchema as unknown as TSchema
 }
 
-export function createCompiledPayloadValidators(): CompiledPayloadValidators {
-  const compiled = {} as CompiledPayloadValidators
+function createCompiledDeltaPayloadValidators(): CompiledDeltaPayloadValidators {
+  const compiled = {} as CompiledDeltaPayloadValidators
 
-  for (const schemaName of Object.keys(KnownValueSchemaRegistry) as SignalKSchemaName[]) {
+  for (const schemaName of Object.keys(KnownDeltaValueSchemaRegistry) as DeltaSchemaName[]) {
     compiled[schemaName] = Compile(
-      payloadSchemaReferences,
-      KnownValueSchemaRegistry[schemaName]
+      deltaSchemaReferences,
+      KnownDeltaValueSchemaRegistry[schemaName]
     )
   }
 
   return compiled
 }
+
+export const compiledDeltaPayloadValidators = createCompiledDeltaPayloadValidators()
 
 export function createCompiledMetadataValidator(): Validator {
   return Compile(MetaSchema as unknown as TSchema)

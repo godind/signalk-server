@@ -1,26 +1,25 @@
-import type { Delta } from '../delta/protocol.js'
+import type { Delta } from '../delta/index.js'
 import type { Metadata, MetadataValue } from './metadata-parser.js'
 import type { Validator } from 'typebox/compile'
 import {
-  KnownValueSchemaRegistry,
+  KnownDeltaValueSchemaRegistry,
   type InvalidPathValue,
   type InvalidValue,
   type NoSchemaTypeValue,
   type NormalizedDeltaValueBase,
   type ParsedValue,
-  type SignalKSchemaName,
+  type DeltaSchemaName,
   type UnknownSchemaTypeInvalidValue,
   type UnknownSchemaTypeValue,
   type ValidationError,
   type ValidatedValue
 } from './schema-type-registry.js'
 import {
-  createCompiledMetadataValidator,
-  createCompiledPayloadValidators
+  compiledDeltaPayloadValidators,
+  createCompiledMetadataValidator
 } from './payload-validators.js'
 
 const compiledMetadataValidator = createCompiledMetadataValidator()
-const compiledPayloadValidators = createCompiledPayloadValidators()
 
 type MetadataProcessingMode = 'index-only' | 'validate-only' | 'index-and-validate'
 type Strictness = 'lenient' | 'strict'
@@ -28,7 +27,7 @@ type Strictness = 'lenient' | 'strict'
 export interface SchemaTypeIndexView {
   setValueType(path: string, typeName: string): void
   lookupValueType(path: string): string | undefined
-  lookupSchemaName(path: string): SignalKSchemaName | undefined
+  lookupSchemaName(path: string): DeltaSchemaName | undefined
 }
 
 export function createSchemaTypeIndex(): SchemaTypeIndexView {
@@ -160,7 +159,7 @@ function processValueEntries(
       }
 
       const candidate = { ...base, value: valueEntry.value }
-      const validator = compiledPayloadValidators[schemaName]
+      const validator = compiledDeltaPayloadValidators[schemaName]
       if (validator.Check(candidate)) {
         accepted.push({
           ...candidate,
@@ -269,8 +268,8 @@ function processMetadataEntries(
   return results
 }
 
-function hasKnownSchemaName(value: string): value is SignalKSchemaName {
-  return Object.prototype.hasOwnProperty.call(KnownValueSchemaRegistry, value)
+function hasKnownSchemaName(value: string): value is DeltaSchemaName {
+  return Object.prototype.hasOwnProperty.call(KnownDeltaValueSchemaRegistry, value)
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -281,7 +280,7 @@ function isValidPath(path: unknown): path is string {
   return typeof path === 'string' && path.length > 0
 }
 
-function getImplicitValueType(path: string): SignalKSchemaName | undefined {
+function getImplicitValueType(path: string): DeltaSchemaName | undefined {
   if (path.startsWith('notifications.')) {
     return 'Notification'
   }
@@ -317,7 +316,7 @@ class SchemaTypeIndex {
     return this.pathToMetaType.get(path) ?? getImplicitValueType(path)
   }
 
-  lookupSchemaName(path: string): SignalKSchemaName | undefined {
+  lookupSchemaName(path: string): DeltaSchemaName | undefined {
     const raw = this.lookupValueType(path)
     if (!raw) {
       return undefined

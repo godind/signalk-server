@@ -1,7 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-const sdkImportPromise = import('../dist/index.js')
+const sdkImportPromise = Promise.all([
+  import('../dist/delta/delta.js'),
+  import('../dist/parser/facade.js')
+]).then(([delta, parser]) => ({
+  ...delta,
+  ...parser
+}))
 
 test('delta parser and guards work', async () => {
   const sdk = await sdkImportPromise
@@ -136,6 +142,7 @@ test('transport parser primary mode returns dominant delta errors', async () => 
     context: 'vessels.self',
     updates: [
       {
+        source: {},
         values: [{ path: 'navigation.speedOverGround', value: 6.2 }],
         $source: 'two-solar-chargers.DA:64:FC:ED:05:7E'
       }
@@ -153,7 +160,7 @@ test('transport parser primary mode returns dominant delta errors', async () => 
   )
   assert.ok(
     result.errors.some((error) =>
-      error.includes('delta /updates/0/$source: must match pattern')
+      error.includes('delta /updates/0/source: must have required properties label')
     )
   )
   assert.equal(
@@ -825,4 +832,106 @@ test('payload validator schema references are complete (guard test)', async () =
   assert.equal(notificationResults.length, 1)
   assert.equal(notificationResults[0].validationStatus, 'valid',
     'Fully-populated Notification value must validate; if not, check payloadSchemaReferences in payload-validators.ts contains all Notification/Position refs')
+})
+
+test('parser.parseDeltaValue validates normalized delta values by schema name', async () => {
+  const sdk = await sdkImportPromise
+
+  const parser = sdk.createParser()
+
+  const validResult = parser.parseDeltaValue('Position', {
+    context: 'vessels.self',
+    $source: 'NMEA0183.COM1.GP',
+    path: 'navigation.position',
+    value: { latitude: 60.123, longitude: 24.456 }
+  })
+
+  assert.equal(validResult.ok, true)
+  if (!validResult.ok) {
+    throw new Error(validResult.errors.join('; '))
+  }
+
+  const invalidResult = parser.parseDeltaValue('Position', {
+    context: 'vessels.self',
+    $source: 'NMEA0183.COM1.GP',
+    path: 'navigation.position',
+    value: { latitude: 200 }
+  })
+
+  assert.equal(invalidResult.ok, false)
+  assert.ok(invalidResult.errors.some((error) => error.includes('delta-value')))
+})
+
+test('parser.parseRestPayload validates typed REST payloads by schema name', async () => {
+  const sdk = await sdkImportPromise
+
+  const parser = sdk.createParser()
+
+  const discoveryResult = parser.parseRestPayload('DiscoveryData', {
+    endpoints: {
+      v1: {
+        version: '1.1.0',
+        'signalk-http': 'http://192.168.1.88:3000/signalk/v1/api/'
+      }
+    },
+    server: {
+      id: 'signalk-server-node',
+      version: '2.24.0'
+    }
+  })
+
+  assert.equal(discoveryResult.ok, true)
+  if (!discoveryResult.ok) {
+    throw new Error(discoveryResult.errors.join('; '))
+  }
+
+  const radarControlsResult = parser.parseRestPayload('RadarControlsModel', {
+    gain: {
+      auto: false,
+      value: 42
+    }
+  })
+
+  assert.equal(radarControlsResult.ok, true)
+
+  const invalidResult = parser.parseRestPayload('DiscoveryData', {
+    endpoints: {},
+    server: {
+      id: 123
+    }
+  })
+
+  assert.equal(invalidResult.ok, false)
+  assert.ok(invalidResult.errors.some((error) => error.includes('rest-payload')))
+})
+
+test('parser.parseDeltaValue and parseRestPayload are non-throwing for unknown runtime schema names', async () => {
+  const sdk = await sdkImportPromise
+
+  const parser = sdk.createParser()
+
+  const unknownDeltaResult = parser.parseDeltaValue('UnknownDeltaSchema', {
+    context: 'vessels.self',
+    $source: 'NMEA0183.COM1.GP',
+    path: 'navigation.position',
+    value: { latitude: 60.123, longitude: 24.456 }
+  })
+
+  assert.equal(unknownDeltaResult.ok, false)
+  assert.ok(
+    unknownDeltaResult.errors.some((error) =>
+      error.includes('unknown delta schema=UnknownDeltaSchema')
+    )
+  )
+
+  const unknownRestResult = parser.parseRestPayload('UnknownRestSchema', {
+    value: 'x'
+  })
+
+  assert.equal(unknownRestResult.ok, false)
+  assert.ok(
+    unknownRestResult.errors.some((error) =>
+      error.includes('unknown rest schema=UnknownRestSchema')
+    )
+  )
 })

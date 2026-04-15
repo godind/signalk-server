@@ -429,9 +429,7 @@ const UpdateBase = Type.Object({
   source: Type.Optional(SourceSchema),
   $source: Type.Optional(
     Type.String({
-      pattern: '^[A-Za-z0-9-_.]*$',
-      description:
-        'Reference to the source under /sources. A dot separated path to the data, e.g. [type].[bus].[device]',
+      description: 'Reference to the source under /sources.',
       examples: ['NMEA0183.COM1.GP']
     })
   ),

@@ -33,24 +33,20 @@ const publishManifest = {
       import: './index.js'
     },
     './delta': {
-      types: './delta/index.d.ts',
-      import: './delta/index.js'
+      types: './delta/delta.d.ts',
+      import: './delta/delta.js'
     },
     './delta/protocol': {
       types: './delta/protocol.d.ts',
       import: './delta/protocol.js'
     },
     './delta/metadata': {
-      types: './delta/metadata/index.d.ts',
-      import: './delta/metadata/index.js'
+      types: './delta/metadata.d.ts',
+      import: './delta/metadata.js'
     },
     './delta/payload': {
       types: './delta/payload/index.d.ts',
       import: './delta/payload/index.js'
-    },
-    './delta/payload/value': {
-      types: './delta/payload/value.d.ts',
-      import: './delta/payload/value.js'
     },
     './delta/payload/notification': {
       types: './delta/payload/notification.d.ts',
@@ -59,6 +55,38 @@ const publishManifest = {
     './rest': {
       types: './rest/index.d.ts',
       import: './rest/index.js'
+    },
+    './rest/notifications': {
+      types: './rest/notifications.d.ts',
+      import: './rest/notifications.js'
+    },
+    './rest/discovery': {
+      types: './rest/discovery.d.ts',
+      import: './rest/discovery.js'
+    },
+    './rest/history': {
+      types: './rest/history.d.ts',
+      import: './rest/history.js'
+    },
+    './rest/resources': {
+      types: './rest/resources.d.ts',
+      import: './rest/resources.js'
+    },
+    './rest/course': {
+      types: './rest/course.d.ts',
+      import: './rest/course.js'
+    },
+    './rest/autopilot': {
+      types: './rest/autopilot.d.ts',
+      import: './rest/autopilot.js'
+    },
+    './rest/radar': {
+      types: './rest/radar.d.ts',
+      import: './rest/radar.js'
+    },
+    './rest/weather': {
+      types: './rest/weather.d.ts',
+      import: './rest/weather.js'
     },
     './parser': {
       types: './parser/facade.d.ts',

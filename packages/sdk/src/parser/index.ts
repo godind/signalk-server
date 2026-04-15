@@ -1,13 +1,15 @@
 import {
   DeltaDataSchema,
-  isDeltaDataMessage,
-  isProtocolControlMessage,
   ProtocolControlMessageSchema,
   type Delta,
   type ProtocolControlMessage,
   type TransportMessage,
   type TransportScope
-} from '../delta/protocol.js'
+} from '../delta/index.js'
+import {
+  isDeltaDataMessage,
+  isProtocolControlMessage,
+} from '../delta/helpers.js'
 import { Value } from 'typebox/value'
 import type { TSchema } from 'typebox'
 import {
@@ -18,10 +20,21 @@ import {
   validateDeltaMetadata,
   validateDeltaValues
 } from './payload-parser.js'
+import { compiledDeltaPayloadValidators } from './payload-validators.js'
+import { compiledRestPayloadValidators } from './rest-payload-validators.js'
 import type { InvalidMetadata, Metadata, ValidMetadata } from './metadata-parser.js'
-import type { ParsedValue } from './schema-type-registry.js'
+import type {
+  DeltaSchemaName,
+  KnownDeltaValueTypeMap,
+  ParsedValue
+} from './schema-type-registry.js'
+import type {
+  KnownRestPayloadTypeMap,
+  RestSchemaName
+} from './rest-schema-registry.js'
 
 export type {
+  DeltaSchemaName,
   InvalidPathValue,
   InvalidValue,
   ParsedValue,
@@ -30,15 +43,18 @@ export type {
 } from './schema-type-registry.js'
 
 export type {
+  KnownRestPayloadTypeMap,
+  RestSchemaName
+} from './rest-schema-registry.js'
+
+export type {
   InvalidMetadata,
   Metadata,
-  MetadataBase,
   MetadataValidationError,
-  MetadataValidationStatus,
   ValidMetadata
 } from './metadata-parser.js'
 
-export type ValidationScope = 'transport' | 'payload' | 'metadata' | 'notification' | 'all'
+export type ValidationScope = 'transport' | 'payload' | 'metadata' | 'all'
 export type TransportErrorMode = 'verbose' | 'primary'
 
 export interface ParserConfig {
@@ -48,8 +64,6 @@ export interface ParserConfig {
   formatValidation?: boolean
   transportErrorMode?: TransportErrorMode
 }
-
-export type ParseStatus = 'valid' | 'invalid'
 
 export interface ParseSuccess<T> {
   ok: true
@@ -66,10 +80,20 @@ export interface ParseFailure {
 
 export type ParseResult<T> = ParseSuccess<T> | ParseFailure
 
+export type AllSchemaName = DeltaSchemaName | RestSchemaName
+
 export interface SignalKParser {
   parseDeltaObject(value: unknown): ParseResult<Delta>
   parseDeltaJson(json: string): ParseResult<Delta>
   parseTransportMessage(value: unknown): ParseResult<TransportMessage>
+  parseDeltaValue<K extends DeltaSchemaName>(
+    schemaName: K,
+    value: unknown
+  ): ParseResult<KnownDeltaValueTypeMap[K]>
+  parseRestPayload<K extends RestSchemaName>(
+    schemaName: K,
+    value: unknown
+  ): ParseResult<KnownRestPayloadTypeMap[K]>
 
   /**
    * Update the parser's internal meta.type index from delta metadata entries.
@@ -255,13 +279,44 @@ export function isInvalidMetadata(
   return metadata.validationStatus === 'invalid'
 }
 
+function parseSchemaValue<T>(
+  schemaName: string,
+  value: unknown,
+  check: (candidate: unknown) => boolean,
+  label: string,
+  errors: (candidate: unknown) => Iterable<{ instancePath?: string; message: string }>
+): ParseResult<T> {
+  if (check(value)) {
+    return valid(value as T)
+  }
+
+  return invalid(
+    `Input is not a valid ${label} payload for schema=${schemaName}`,
+    ...[...errors(value)].slice(0, 3).map((error) => {
+      const path =
+        typeof error.instancePath === 'string' && error.instancePath.length > 0
+          ? error.instancePath
+          : '/'
+
+      return `${label} ${path}: ${error.message}`
+    })
+  )
+}
+
+function hasValidator(
+  validators: Record<string, unknown>,
+  schemaName: string
+): boolean {
+  return Object.prototype.hasOwnProperty.call(validators, schemaName)
+}
+
 export function createParser(config: ParserConfig = {}): SignalKParser {
   const strictness = config.strictness ?? 'lenient'
   const validationScope = config.validationScope ?? 'all'
   const transportScope = config.transportScope ?? 'all'
   const transportEnabled = validationScope === 'transport' || validationScope === 'all'
   const metadataEnabled = validationScope !== 'transport'
-  const valueEnabled = validationScope === 'payload' || validationScope === 'notification' || validationScope === 'all'
+  const valueEnabled = validationScope === 'payload' || validationScope === 'all'
   const transportErrorMode = config.transportErrorMode ?? 'primary'
   const schemaTypeIndex = createSchemaTypeIndex()
 
@@ -328,6 +383,46 @@ export function createParser(config: ParserConfig = {}): SignalKParser {
           : `Input did not match transport scope=${transportScope}`,
         ...(deltaFailure?.errors ?? []),
         ...protocolResult.errors
+      )
+    },
+    parseDeltaValue<K extends DeltaSchemaName>(
+      schemaName: K,
+      value: unknown
+    ): ParseResult<KnownDeltaValueTypeMap[K]> {
+      const schemaNameValue = String(schemaName)
+      if (!hasValidator(compiledDeltaPayloadValidators, schemaNameValue)) {
+        return invalid(
+          `Input referenced unknown delta schema=${schemaNameValue}`
+        )
+      }
+
+      const validator = compiledDeltaPayloadValidators[schemaName]
+      return parseSchemaValue<KnownDeltaValueTypeMap[K]>(
+        schemaNameValue,
+        value,
+        (candidate) => validator.Check(candidate),
+        'delta-value',
+        (candidate) => validator.Errors(candidate)
+      )
+    },
+    parseRestPayload<K extends RestSchemaName>(
+      schemaName: K,
+      value: unknown
+    ): ParseResult<KnownRestPayloadTypeMap[K]> {
+      const schemaNameValue = String(schemaName)
+      if (!hasValidator(compiledRestPayloadValidators, schemaNameValue)) {
+        return invalid(
+          `Input referenced unknown rest schema=${schemaNameValue}`
+        )
+      }
+
+      const validator = compiledRestPayloadValidators[schemaName]
+      return parseSchemaValue<KnownRestPayloadTypeMap[K]>(
+        schemaNameValue,
+        value,
+        (candidate) => validator.Check(candidate),
+        'rest-payload',
+        (candidate) => validator.Errors(candidate)
       )
     },
     indexSchemaTypes(delta: Delta): void {

@@ -1,6 +1,6 @@
-import type { MetadataValue } from '../delta/metadata/index.js'
+import type { MetadataValue } from '../delta/metadata.js'
 
-export type { MetadataValue } from '../delta/metadata/index.js'
+export type { MetadataValue } from '../delta/metadata.js'
 
 export type MetadataValidationStatus = 'valid' | 'invalid'
 

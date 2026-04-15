@@ -6,12 +6,11 @@ import {
 } from '@signalk/sdk/parser'
 import { getDeltaUpdateCount, isDelta } from '@signalk/sdk/delta'
 
-
 const DEFAULT_WS_URL =
   'ws://localhost:3000/signalk/v1/stream?subscribe=*&sendMeta=all'
 const wsUrl = process.env.SK_WS_URL ?? DEFAULT_WS_URL
 
-const VALID_VALIDATION_SCOPES = ['transport', 'payload', 'metadata', 'notification', 'all'] as const
+const VALID_VALIDATION_SCOPES = ['transport', 'payload', 'metadata', 'all'] as const
 type SmokeValidationScope = (typeof VALID_VALIDATION_SCOPES)[number]
 const envValidationScope = process.env.SK_VALIDATION_SCOPE
 const validationScope: SmokeValidationScope =
@@ -78,25 +77,6 @@ async function processTransportStream(): Promise<never> {
           return
         }
 
-        if (validationScope === 'notification') {
-          parser.indexSchemaTypes(parsed.value)
-
-          const notificationOutcomes = parser.validateValues(parsed.value)
-            .filter((outcome) => outcome.path.startsWith('notifications.'))
-
-          if (notificationOutcomes.length === 0) {
-            return
-          }
-
-          logPayloadOutcomes(notificationOutcomes)
-
-          log('info', 'ws.message.classified', 'delta-notification-only', {
-            valid: true,
-            notificationCount: notificationOutcomes.length
-          })
-          return
-        }
-
         const metadataOutcomes = parser.processMetadata(parsed.value)
         logMetadataOutcomes(metadataOutcomes)
 
@@ -141,10 +121,6 @@ async function processTransportStream(): Promise<never> {
       }
 
       if (!transportEnabled) {
-        if (validationScope === 'notification') {
-          return
-        }
-
         log('info', 'ws.message.classified', 'non-delta-ignored', {
           valid: true,
           scope: validationScope,

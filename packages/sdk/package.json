@@ -12,24 +12,20 @@
       "import": "./dist/package/index.js"
     },
     "./delta": {
-      "types": "./dist/package/delta/index.d.ts",
-      "import": "./dist/package/delta/index.js"
+      "types": "./dist/package/delta/delta.d.ts",
+      "import": "./dist/package/delta/delta.js"
     },
     "./delta/protocol": {
       "types": "./dist/package/delta/protocol.d.ts",
       "import": "./dist/package/delta/protocol.js"
     },
     "./delta/metadata": {
-      "types": "./dist/package/delta/metadata/index.d.ts",
-      "import": "./dist/package/delta/metadata/index.js"
+      "types": "./dist/package/delta/metadata.d.ts",
+      "import": "./dist/package/delta/metadata.js"
     },
     "./delta/payload": {
       "types": "./dist/package/delta/payload/index.d.ts",
       "import": "./dist/package/delta/payload/index.js"
-    },
-    "./delta/payload/value": {
-      "types": "./dist/package/delta/payload/value.d.ts",
-      "import": "./dist/package/delta/payload/value.js"
     },
     "./delta/payload/notification": {
       "types": "./dist/package/delta/payload/notification.d.ts",
@@ -38,6 +34,38 @@
     "./rest": {
       "types": "./dist/package/rest/index.d.ts",
       "import": "./dist/package/rest/index.js"
+    },
+    "./rest/notifications": {
+      "types": "./dist/package/rest/notifications.d.ts",
+      "import": "./dist/package/rest/notifications.js"
+    },
+    "./rest/discovery": {
+      "types": "./dist/package/rest/discovery.d.ts",
+      "import": "./dist/package/rest/discovery.js"
+    },
+    "./rest/history": {
+      "types": "./dist/package/rest/history.d.ts",
+      "import": "./dist/package/rest/history.js"
+    },
+    "./rest/resources": {
+      "types": "./dist/package/rest/resources.d.ts",
+      "import": "./dist/package/rest/resources.js"
+    },
+    "./rest/course": {
+      "types": "./dist/package/rest/course.d.ts",
+      "import": "./dist/package/rest/course.js"
+    },
+    "./rest/autopilot": {
+      "types": "./dist/package/rest/autopilot.d.ts",
+      "import": "./dist/package/rest/autopilot.js"
+    },
+    "./rest/radar": {
+      "types": "./dist/package/rest/radar.d.ts",
+      "import": "./dist/package/rest/radar.js"
+    },
+    "./rest/weather": {
+      "types": "./dist/package/rest/weather.d.ts",
+      "import": "./dist/package/rest/weather.js"
     },
     "./parser": {
       "types": "./dist/package/parser/facade.d.ts",

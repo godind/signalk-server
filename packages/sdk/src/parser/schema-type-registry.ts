@@ -4,20 +4,23 @@ import {
   PositionSchema
 } from '@signalk/server-api/typebox'
 
+// PositionSchema is intentionally imported from server-api/typebox.
+// SDK parser validation should track server-api as the single schema source.
+
 /**
  * Schema-type registry for payload parsing.
  *
  * Extension guide (single source of truth):
  * 1. Define a new `*DeltaValueSchema` in this file.
- * 2. Add one entry to `KnownValueSchemaRegistry` where:
+ * 2. Add one entry to `KnownDeltaValueSchemaRegistry` where:
  *    - key = incoming `meta.type` string
  *    - value = matching TypeBox schema for the normalized delta payload
  *
  * Automation provided by this module:
- * - `SignalKSchemaName` is auto-derived from registry keys.
- * - `KnownValueTypeMap` is auto-derived from registry schemas via `Type.Static`.
+ * - `DeltaSchemaName` is auto-derived from registry keys.
+ * - `KnownDeltaValueTypeMap` is auto-derived from registry schemas via `Type.Static`.
  * - `ValidatedValue` and `InvalidValue` unions are auto-derived from
- *   `SignalKSchemaName` and `KnownValueTypeMap`.
+ *   `DeltaSchemaName` and `KnownDeltaValueTypeMap`.
  *
  * Practical rule: when adding a new schema type, update only the schema
  * definition and the registry entry. Do not manually edit the derived unions.
@@ -68,13 +71,13 @@ function defineSchemaTypeRegistry<const T extends Record<string, TSchema>>(
   return registry
 }
 
-export const KnownValueSchemaRegistry = defineSchemaTypeRegistry({
+export const KnownDeltaValueSchemaRegistry = defineSchemaTypeRegistry({
   Numeric: NumericDeltaValueSchema,
   Position: PositionDeltaValueSchema,
   Notification: NotificationDeltaValueSchema
 })
 
-export type SignalKSchemaName = keyof typeof KnownValueSchemaRegistry
+export type DeltaSchemaName = keyof typeof KnownDeltaValueSchemaRegistry
 
 export type SchemaTypeStatus =
   | 'no-schema-type'
@@ -89,26 +92,26 @@ export interface ValidationError {
   message: string
 }
 
-export type KnownValueTypeMap = {
-  [K in SignalKSchemaName]: Type.Static<(typeof KnownValueSchemaRegistry)[K]>
+export type KnownDeltaValueTypeMap = {
+  [K in DeltaSchemaName]: Type.Static<(typeof KnownDeltaValueSchemaRegistry)[K]>
 }
 
-export type NumericDeltaValue = KnownValueTypeMap['Numeric']
-export type PositionDeltaValue = KnownValueTypeMap['Position']
-export type NotificationDeltaValue = KnownValueTypeMap['Notification']
+export type NumericDeltaValue = KnownDeltaValueTypeMap['Numeric']
+export type PositionDeltaValue = KnownDeltaValueTypeMap['Position']
+export type NotificationDeltaValue = KnownDeltaValueTypeMap['Notification']
 
-type KnownSchemaTag<K extends SignalKSchemaName> = {
+type KnownSchemaTag<K extends DeltaSchemaName> = {
   schemaName: K
   valueType: K
   schemaTypeStatus: 'known-schema-type'
 }
 
-type KnownSchemaValidated<K extends SignalKSchemaName> = KnownValueTypeMap[K] &
+type KnownSchemaValidated<K extends DeltaSchemaName> = KnownDeltaValueTypeMap[K] &
   KnownSchemaTag<K> & {
     validationStatus: 'valid'
   }
 
-type KnownSchemaInvalid<K extends SignalKSchemaName> = NormalizedDeltaValueBase &
+type KnownSchemaInvalid<K extends DeltaSchemaName> = NormalizedDeltaValueBase &
   KnownSchemaTag<K> & {
     value: unknown
     validationStatus: 'invalid'
@@ -116,12 +119,12 @@ type KnownSchemaInvalid<K extends SignalKSchemaName> = NormalizedDeltaValueBase 
   }
 
 export type ValidatedValue = {
-  [K in SignalKSchemaName]: KnownSchemaValidated<K>
-}[SignalKSchemaName]
+  [K in DeltaSchemaName]: KnownSchemaValidated<K>
+}[DeltaSchemaName]
 
 export type InvalidValue = {
-  [K in SignalKSchemaName]: KnownSchemaInvalid<K>
-}[SignalKSchemaName]
+  [K in DeltaSchemaName]: KnownSchemaInvalid<K>
+}[DeltaSchemaName]
 
 export type NoSchemaTypeValue = NormalizedDeltaValueBase & {
   value: unknown

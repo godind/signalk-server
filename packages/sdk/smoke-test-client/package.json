@@ -8,5 +8,6 @@
     "start": "npm run build && node ./dist/index.js"
   },
   "dependencies": {
+    "@signalk/sdk": "../"
   }
 }
